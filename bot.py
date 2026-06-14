@@ -9,12 +9,10 @@ URL = f"https://api.telegram.org/bot{TOKEN}"
 
 offset = 0
 
-# активные игры
 games = {}
 
-# счётчик СЛОТОВ (не сообщений)
-slot_counter = 0
-next_slot_trigger = random.randint(5, 15)
+# защита от спама слотов
+slot_lock = {}
 
 slot_texts = [
     "Очень близко! А значит шанс еще живой 🤩",
@@ -26,6 +24,7 @@ slot_texts = [
 print("BOT STARTED")
 
 
+# =====================
 def send(chat_id, text, reply_to=None, markup=None):
     data = {
         "chat_id": chat_id,
@@ -45,6 +44,7 @@ def send(chat_id, text, reply_to=None, markup=None):
         pass
 
 
+# =====================
 def keyboard():
     kb = []
     n = 1
@@ -62,16 +62,16 @@ def keyboard():
     return {"inline_keyboard": kb}
 
 
+# =====================
 def create_boxes():
     boxes = {}
-
     for i in range(1, 26):
-        # NFT НИКОГДА не выигрывается
+        # NFT НЕ существует
         boxes[i] = random.choice([15, 25])
-
     return boxes
 
 
+# =====================
 def open_box(cb):
     chat_id = cb["message"]["chat"]["id"]
     user_id = cb["from"]["id"]
@@ -95,14 +95,11 @@ def open_box(cb):
     game["opened"] = True
 
     chosen = int(cb["data"])
-
-    # выбранная коробка
-    selected_text = "✅"
+    result = game["boxes"][chosen]
 
     text = (
-        f"🎉 <b>Вы выиграли {game['boxes'][chosen]} ⭐</b>\n\n"
-        "🎰 <b>Вы почти выиграли NFT</b>\n"
-        "💎 <b>NFT нельзя получить</b>\n\n"
+        f"🎉 <b>Вы выиграли {result} ⭐</b>\n\n"
+        "💎 <b>NFT нельзя выиграть</b>\n\n"
         "<b>Заберите награду в закрепе</b>"
     )
 
@@ -114,18 +111,13 @@ def open_box(cb):
     })
 
 
+# =====================
 def handle_slot(chat_id, user_id, msg_id):
-    global slot_counter, next_slot_trigger
 
-    slot_counter += 1
+    # защита: игра уже идёт
+    if chat_id in games and not games[chat_id]["opened"]:
+        return
 
-    # рандомное сообщение каждые 5–15 слотов
-    if slot_counter >= next_slot_trigger:
-        send(chat_id, random.choice(slot_texts))
-        slot_counter = 0
-        next_slot_trigger = random.randint(5, 15)
-
-    # старт игры по слоту 🎰
     games[chat_id] = {
         "user_id": user_id,
         "boxes": create_boxes(),
@@ -140,6 +132,7 @@ def handle_slot(chat_id, user_id, msg_id):
     )
 
 
+# =====================
 while True:
     try:
         r = requests.get(
@@ -167,6 +160,14 @@ while True:
             # 🎰 слот Telegram
             if "dice" in msg:
                 if msg["dice"]["emoji"] == "🎰":
+
+                    # анти-спам слота
+                    if chat_id in slot_lock:
+                        if time.time() - slot_lock[chat_id] < 2:
+                            continue
+
+                    slot_lock[chat_id] = time.time()
+
                     handle_slot(chat_id, user_id, msg_id)
 
         time.sleep(0.5)
