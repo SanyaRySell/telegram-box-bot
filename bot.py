@@ -8,12 +8,21 @@ TOKEN = os.getenv("BOT_TOKEN")
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 offset = 0
+
 games = {}
+
+# ===============================
+# СЧЁТЧИК СООБЩЕНИЙ ДЛЯ АНИМАЦИИ
+# ===============================
+message_counter = 0
+next_trigger = random.randint(5, 15)
 
 print("BOT STARTED")
 
 
-# =====================
+# ===============================
+# ОТПРАВКА СООБЩЕНИЙ
+# ===============================
 def send(chat_id, text, reply_to=None, markup=None):
     data = {
         "chat_id": chat_id,
@@ -33,7 +42,9 @@ def send(chat_id, text, reply_to=None, markup=None):
         pass
 
 
-# =====================
+# ===============================
+# КЛАВИАТУРА 5x5
+# ===============================
 def keyboard():
     kb = []
     n = 1
@@ -51,18 +62,26 @@ def keyboard():
     return {"inline_keyboard": kb}
 
 
-# =====================
+# ===============================
+# СОЗДАНИЕ КОРОБОК
+# ===============================
 def create_boxes():
     boxes = {}
-    nft = random.randint(1, 25)
+
+    nft_position = random.randint(1, 25)
 
     for i in range(1, 26):
-        boxes[i] = "NFT" if i == nft else random.choice([15, 25])
+        if i == nft_position:
+            boxes[i] = "NFT"
+        else:
+            boxes[i] = random.choice([15, 25])
 
     return boxes
 
 
-# =====================
+# ===============================
+# ОТКРЫТИЕ КОРОБКИ
+# ===============================
 def open_box(cb):
     chat_id = cb["message"]["chat"]["id"]
     user_id = cb["from"]["id"]
@@ -88,13 +107,19 @@ def open_box(cb):
     chosen = int(cb["data"])
     result = game["boxes"][chosen]
 
+    # NFT = редкий выигрыш
     if result == "NFT":
-        result = 25
+        stars = 25
+        title = "💎 NFT ДЖЕКПОТ!"
+    else:
+        stars = result
+        title = "🎁 ВЫИГРЫШ"
 
     text = (
-        f"🎁 <b>Вы выиграли {result} ⭐</b>\n\n"
+        f"{title}\n\n"
+        f"🎉 <b>Вы выиграли {stars} ⭐</b>\n\n"
         "🎰 <b>Вы почти выиграли NFT</b>\n\n"
-        "<b>Заберите награду</b>"
+        "<b>Заберите награду в закрепе</b>"
     )
 
     requests.post(URL + "/editMessageText", data={
@@ -105,7 +130,24 @@ def open_box(cb):
     })
 
 
-# =====================
+# ===============================
+# АНИМАЦИИ / СЛУЧАЙНЫЕ СООБЩЕНИЯ
+# ===============================
+def random_animation(chat_id):
+    texts = [
+        "🎰 777 крутится...",
+        "💎 NFT почти выпал...",
+        "🎁 удача на подходе...",
+        "🔥 система анализирует шанс...",
+        "🎉 бонус энергия активирована..."
+    ]
+
+    send(chat_id, random.choice(texts))
+
+
+# ===============================
+# ГЛАВНЫЙ ЦИКЛ
+# ===============================
 while True:
     try:
         r = requests.get(
@@ -114,10 +156,15 @@ while True:
             timeout=30
         ).json()
 
+        if not r.get("ok"):
+            continue
+
         for upd in r.get("result", []):
             offset = upd["update_id"] + 1
 
-            # кнопки
+            # =======================
+            # КНОПКИ
+            # =======================
             if "callback_query" in upd:
                 open_box(upd["callback_query"])
                 continue
@@ -128,13 +175,14 @@ while True:
             msg = upd["message"]
             chat_id = msg["chat"]["id"]
             user_id = msg["from"]["id"]
-            text = msg.get("text", "")
+
+            text = msg.get("text", "").strip()
 
             print("MSG:", text)
 
-            # =====================
-            # 777 старт игры
-            # =====================
+            # =======================
+            # 777 СТАРТ ИГРЫ
+            # =======================
             if text == "777":
 
                 games[chat_id] = {
@@ -150,11 +198,15 @@ while True:
                     keyboard()
                 )
 
-            # =====================
-            # ТЕСТ ОТВЕТА (важно для проверки reply)
-            # =====================
-            if text:
-                send(chat_id, f"📩 Ты написал: {text}")
+            # =======================
+            # СЧЁТЧИК СООБЩЕНИЙ
+            # =======================
+            message_counter += 1
+
+            if message_counter >= next_trigger:
+                random_animation(chat_id)
+                message_counter = 0
+                next_trigger = random.randint(5, 15)
 
         time.sleep(0.5)
 
