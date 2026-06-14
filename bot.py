@@ -10,12 +10,7 @@ URL = f"https://api.telegram.org/bot{TOKEN}"
 offset = 0
 games = {}
 
-messages = [
-    "🎰 ПОЧТИ JACKPOT 777! 🎰",
-    "🎁 Удача рядом",
-    "💎 NFT почти твой",
-    "🔥 Не сдавайся"
-]
+print("BOT STARTED")
 
 
 # =====================
@@ -32,7 +27,10 @@ def send(chat_id, text, reply_to=None, markup=None):
     if markup:
         data["reply_markup"] = json.dumps(markup)
 
-    requests.post(URL + "/sendMessage", data=data)
+    try:
+        requests.post(URL + "/sendMessage", data=data, timeout=10)
+    except:
+        pass
 
 
 # =====================
@@ -56,10 +54,10 @@ def keyboard():
 # =====================
 def create_boxes():
     boxes = {}
-    nft_pos = random.randint(1, 25)
+    nft = random.randint(1, 25)
 
     for i in range(1, 26):
-        boxes[i] = "NFT" if i == nft_pos else random.choice([15, 25])
+        boxes[i] = "NFT" if i == nft else random.choice([15, 25])
 
     return boxes
 
@@ -96,7 +94,7 @@ def open_box(cb):
     text = (
         f"🎁 <b>Вы выиграли {result} ⭐</b>\n\n"
         "🎰 <b>Вы почти выиграли NFT</b>\n\n"
-        "<b>Заберите награду в закрепе</b>"
+        "<b>Заберите награду</b>"
     )
 
     requests.post(URL + "/editMessageText", data={
@@ -108,11 +106,13 @@ def open_box(cb):
 
 
 # =====================
-print("BOT STARTED")
-
 while True:
     try:
-        r = requests.get(URL + f"/getUpdates?offset={offset}&timeout=20").json()
+        r = requests.get(
+            URL + "/getUpdates",
+            params={"offset": offset, "timeout": 20},
+            timeout=30
+        ).json()
 
         for upd in r.get("result", []):
             offset = upd["update_id"] + 1
@@ -130,8 +130,13 @@ while True:
             user_id = msg["from"]["id"]
             text = msg.get("text", "")
 
+            print("MSG:", text)
+
+            # =====================
             # 777 старт игры
+            # =====================
             if text == "777":
+
                 games[chat_id] = {
                     "user_id": user_id,
                     "opened": False,
@@ -140,16 +145,18 @@ while True:
 
                 send(
                     chat_id,
-                    "🏆 <b>ДЖЕКПОТ 777!</b>\n\nВыбери коробку",
+                    "🏆 <b>ДЖЕКПОТ 777!</b>\n\nВыберите коробку 👇",
                     msg["message_id"],
                     keyboard()
                 )
 
-            # случайные сообщения
-            if random.randint(1, 20) == 1:
-                send(chat_id, random.choice(messages))
+            # =====================
+            # ТЕСТ ОТВЕТА (важно для проверки reply)
+            # =====================
+            if text:
+                send(chat_id, f"📩 Ты написал: {text}")
 
-        time.sleep(1)
+        time.sleep(0.5)
 
     except Exception as e:
         print("ERROR:", e)
