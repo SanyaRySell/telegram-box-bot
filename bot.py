@@ -12,12 +12,13 @@ games = {}
 
 messages = [
     "🎰 ПОЧТИ JACKPOT 777! 🎰",
-    "🎁 Слишком близко чтобы сдаваться",
-    "🔥 Удача рядом",
-    "💎 NFT почти в руках"
+    "🎁 Удача рядом",
+    "💎 NFT почти твой",
+    "🔥 Не сдавайся"
 ]
 
 
+# =====================
 def send(chat_id, text, reply_to=None, markup=None):
     data = {
         "chat_id": chat_id,
@@ -34,7 +35,8 @@ def send(chat_id, text, reply_to=None, markup=None):
     requests.post(URL + "/sendMessage", data=data)
 
 
-def make_keyboard():
+# =====================
+def keyboard():
     kb = []
     n = 1
 
@@ -51,17 +53,19 @@ def make_keyboard():
     return {"inline_keyboard": kb}
 
 
+# =====================
 def create_boxes():
     boxes = {}
-    nft = random.randint(1, 25)
+    nft_pos = random.randint(1, 25)
 
     for i in range(1, 26):
-        boxes[i] = "NFT" if i == nft else random.choice([15, 25])
+        boxes[i] = "NFT" if i == nft_pos else random.choice([15, 25])
 
     return boxes
 
 
-def handle_click(cb):
+# =====================
+def open_box(cb):
     chat_id = cb["message"]["chat"]["id"]
     user_id = cb["from"]["id"]
     msg_id = cb["message"]["message_id"]
@@ -92,7 +96,7 @@ def handle_click(cb):
     text = (
         f"🎁 <b>Вы выиграли {result} ⭐</b>\n\n"
         "🎰 <b>Вы почти выиграли NFT</b>\n\n"
-        "<b>Заберите награду</b>"
+        "<b>Заберите награду в закрепе</b>"
     )
 
     requests.post(URL + "/editMessageText", data={
@@ -103,6 +107,7 @@ def handle_click(cb):
     })
 
 
+# =====================
 print("BOT STARTED")
 
 while True:
@@ -110,12 +115,11 @@ while True:
         r = requests.get(URL + f"/getUpdates?offset={offset}&timeout=20").json()
 
         for upd in r.get("result", []):
-
             offset = upd["update_id"] + 1
 
-            # 💥 кнопки
+            # кнопки
             if "callback_query" in upd:
-                handle_click(upd["callback_query"])
+                open_box(upd["callback_query"])
                 continue
 
             if "message" not in upd:
@@ -124,9 +128,9 @@ while True:
             msg = upd["message"]
             chat_id = msg["chat"]["id"]
             user_id = msg["from"]["id"]
-
             text = msg.get("text", "")
 
+            # 777 старт игры
             if text == "777":
                 games[chat_id] = {
                     "user_id": user_id,
@@ -136,12 +140,12 @@ while True:
 
                 send(
                     chat_id,
-                    "🏆 <b>ДЖЕКПОТ 777!</b>\n\nВыберите коробку",
+                    "🏆 <b>ДЖЕКПОТ 777!</b>\n\nВыбери коробку",
                     msg["message_id"],
-                    make_keyboard()
+                    keyboard()
                 )
 
-            # случайные сообщения (проверка что бот жив)
+            # случайные сообщения
             if random.randint(1, 20) == 1:
                 send(chat_id, random.choice(messages))
 
