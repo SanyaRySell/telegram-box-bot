@@ -4,7 +4,7 @@ import time
 import random
 import json
 
-TOKEN = os.getenv("8807117107:AAFmuQU7pxZ6R8FdWF5QsevJePpe6MqGl8E")
+TOKEN = os.getenv("BOT_TOKEN")
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 offset = 0
