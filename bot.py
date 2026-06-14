@@ -3,7 +3,7 @@ import time
 import random
 import json
 
-TOKEN = "ТВОЙ_ТОКЕН"
+TOKEN = "8807117107:AAFmuQU7pxZ6R8FdWF5QsevJePpe6MqGl8E"
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 offset = 0
