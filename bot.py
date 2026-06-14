@@ -10,14 +10,11 @@ URL = f"https://api.telegram.org/bot{TOKEN}"
 offset = 0
 games = {}
 
-msg_counter = 0
-target = random.randint(5, 15)
-
 messages = [
     "🎰 ПОЧТИ JACKPOT 777! 🎰",
     "🎁 Слишком близко чтобы сдаваться",
-    "🔥 Удача уже рядом",
-    "💎 Ты почти поймал NFT"
+    "🔥 Удача рядом",
+    "💎 NFT почти в руках"
 ]
 
 
@@ -56,18 +53,18 @@ def make_keyboard():
 
 def create_boxes():
     boxes = {}
-    nft_pos = random.randint(1, 25)
+    nft = random.randint(1, 25)
 
     for i in range(1, 26):
-        boxes[i] = "NFT" if i == nft_pos else random.choice([15, 25])
+        boxes[i] = "NFT" if i == nft else random.choice([15, 25])
 
     return boxes
 
 
-def handle_gift(cb):
+def handle_click(cb):
     chat_id = cb["message"]["chat"]["id"]
     user_id = cb["from"]["id"]
-    message_id = cb["message"]["message_id"]
+    msg_id = cb["message"]["message_id"]
 
     requests.post(URL + "/answerCallbackQuery", data={
         "callback_query_id": cb["id"]
@@ -93,17 +90,16 @@ def handle_gift(cb):
         result = 25
 
     text = (
-        f"🎁 <b>Вы выиграли {result} звёзд</b>\n\n"
+        f"🎁 <b>Вы выиграли {result} ⭐</b>\n\n"
         "🎰 <b>Вы почти выиграли NFT</b>\n\n"
-        "<b>Заберите выигрыш в закрепе</b>"
+        "<b>Заберите награду</b>"
     )
 
     requests.post(URL + "/editMessageText", data={
         "chat_id": chat_id,
-        "message_id": message_id,
+        "message_id": msg_id,
         "text": text,
-        "parse_mode": "HTML",
-        "reply_markup": json.dumps(make_keyboard())
+        "parse_mode": "HTML"
     })
 
 
@@ -117,8 +113,9 @@ while True:
 
             offset = upd["update_id"] + 1
 
+            # 💥 кнопки
             if "callback_query" in upd:
-                handle_gift(upd["callback_query"])
+                handle_click(upd["callback_query"])
                 continue
 
             if "message" not in upd:
@@ -128,15 +125,9 @@ while True:
             chat_id = msg["chat"]["id"]
             user_id = msg["from"]["id"]
 
-            is_777 = False
+            text = msg.get("text", "")
 
-            if msg.get("text") == "777":
-                is_777 = True
-
-            if msg.get("dice") and msg["dice"]["value"] == 64:
-                is_777 = True
-
-            if is_777:
+            if text == "777":
                 games[chat_id] = {
                     "user_id": user_id,
                     "opened": False,
@@ -145,22 +136,14 @@ while True:
 
                 send(
                     chat_id,
-                    "🏆 <b>ДЖЕКПОТ 777!</b>\n\n🎁 Выберите коробку",
+                    "🏆 <b>ДЖЕКПОТ 777!</b>\n\nВыберите коробку",
                     msg["message_id"],
                     make_keyboard()
                 )
 
-            msg_counter += 1
-
-            if msg_counter >= target:
-                msg_counter = 0
-                target = random.randint(5, 15)
-
-                send(
-                    chat_id,
-                    random.choice(messages),
-                    msg["message_id"]
-                )
+            # случайные сообщения (проверка что бот жив)
+            if random.randint(1, 20) == 1:
+                send(chat_id, random.choice(messages))
 
         time.sleep(1)
 
