@@ -88,12 +88,12 @@ def show_result(game, chosen):
             val = game["boxes"][n]
 
             if val == "NFT":
-                txt = "💎 NFT"
+                txt = "NFT 💎"
             else:
                 txt = f"{val}⭐"
 
             if n == chosen:
-                txt = "✅ " + txt
+                txt = "✅"
 
             row.append({
                 "text": txt,
@@ -139,9 +139,6 @@ def handle_gift(cb):
 
     text = (
         "🏆 <b>ДЖЕКПОТ</b> 🏆\n\n"
-        "<b>Выберите одну из ячеек ниже.</b>\n"
-        "<b>В одной из них находится ГЛАВНЫЙ ПРИЗ - NFT.</b>\n"
-        "<b>В остальных спрятаны 15 и 25 звёзды.</b>\n\n"
         "🎉 <b>Поздравляю!</b>\n\n"
         f"🎁 <b>Вы выиграли {result} ⭐</b>\n\n"
         "<b>Заберите награду в закрепе</b>"
