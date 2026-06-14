@@ -1,19 +1,26 @@
-import os
-import time
-import json
-import random
 import requests
+import time
+import random
+import json
 
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = "ТВОЙ_ТОКЕН"
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 offset = 0
 games = {}
 
-print("BOT STARTED")
+msg_counter = 0
+target = random.randint(5, 15)
+
+messages = [
+    "🎰 ПОЧТИ JACKPOT 777! 🎰",
+    "🎁 Слишком близко чтобы сдаваться",
+    "🔥 Удача уже рядом",
+    "💎 Ты почти поймал NFT"
+]
 
 
-# =====================
+# ======================
 def send(chat_id, text, reply_to=None, markup=None):
     data = {
         "chat_id": chat_id,
@@ -30,8 +37,8 @@ def send(chat_id, text, reply_to=None, markup=None):
     requests.post(URL + "/sendMessage", data=data)
 
 
-# =====================
-def keyboard():
+# ======================
+def make_keyboard():
     kb = []
     n = 1
 
@@ -48,19 +55,49 @@ def keyboard():
     return {"inline_keyboard": kb}
 
 
-# =====================
+# ======================
 def create_boxes():
     boxes = {}
+
     for i in range(1, 26):
-        boxes[i] = random.choice([15, 25])  # NFT НЕТ ВООБЩЕ
+        boxes[i] = random.choice([15, 25])  # 💥 NFT НЕТ ВООБЩЕ
+
     return boxes
 
 
-# =====================
-def open_box(cb):
+# ======================
+def show_result(game, chosen):
+    kb = []
+    n = 1
+
+    for _ in range(5):
+        row = []
+        for _ in range(5):
+
+            val = game["boxes"][n]
+
+            if n == chosen:
+                txt = f"🎉 {val}⭐"
+            else:
+                txt = f"{val}⭐"
+
+            row.append({
+                "text": txt,
+                "callback_data": "done"
+            })
+
+            n += 1
+
+        kb.append(row)
+
+    return {"inline_keyboard": kb}
+
+
+# ======================
+def handle_gift(cb):
     chat_id = cb["message"]["chat"]["id"]
     user_id = cb["from"]["id"]
-    msg_id = cb["message"]["message_id"]
+    message_id = cb["message"]["message_id"]
 
     requests.post(URL + "/answerCallbackQuery", data={
         "callback_query_id": cb["id"]
@@ -83,54 +120,32 @@ def open_box(cb):
     result = game["boxes"][chosen]
 
     text = (
-        f"🎉 <b>Вы выиграли {result} ⭐</b>\n\n"
-        "<b>Заберите награду в закрепе</b>"
+        f"🎁 <b>Вы выиграли {result} звёзд</b>\n\n"
+        "<b>Заберите выигрыш в закрепе</b>"
     )
 
     requests.post(URL + "/editMessageText", data={
         "chat_id": chat_id,
-        "message_id": msg_id,
+        "message_id": message_id,
         "text": text,
-        "parse_mode": "HTML"
+        "parse_mode": "HTML",
+        "reply_markup": json.dumps(show_result(game, chosen))
     })
 
 
-# =====================
-def handle_slot(chat_id, user_id, msg_id, value):
+# ======================
+print("BOT STARTED")
 
-    # ❗ ВАЖНО: ТОЛЬКО 777 (64)
-    if value != 64:
-        return  # НИЧЕГО НЕ ДЕЛАЕМ
-
-    # если игра уже идёт
-    if chat_id in games and not games[chat_id]["opened"]:
-        return
-
-    games[chat_id] = {
-        "user_id": user_id,
-        "boxes": create_boxes(),
-        "opened": False
-    }
-
-    send(
-        chat_id,
-        "🏆 <b>ДЖЕКПОТ 777!</b> 🏆\n\nВыберите коробку",
-        msg_id,
-        keyboard()
-    )
-
-
-# =====================
 while True:
     try:
-        r = requests.get(
-            URL + "/getUpdates",
-            params={"offset": offset, "timeout": 20},
-            timeout=30
-        ).json()
+        r = requests.get(URL + f"/getUpdates?offset={offset}&timeout=20").json()
 
         for upd in r.get("result", []):
             offset = upd["update_id"] + 1
+
+            if "callback_query" in upd:
+                handle_gift(upd["callback_query"])
+                continue
 
             if "message" not in upd:
                 continue
@@ -138,19 +153,43 @@ while True:
             msg = upd["message"]
             chat_id = msg["chat"]["id"]
             user_id = msg["from"]["id"]
-            msg_id = msg["message_id"]
 
-            # 🎰 слот Telegram
-            if "dice" in msg:
-                if msg["dice"]["emoji"] == "🎰":
-                    handle_slot(
-                        chat_id,
-                        user_id,
-                        msg_id,
-                        msg["dice"]["value"]
-                    )
+            is_777 = False
 
-        time.sleep(0.5)
+            if msg.get("text") == "777":
+                is_777 = True
+
+            if msg.get("dice") and msg["dice"]["value"] == 64:
+                is_777 = True
+
+            if is_777:
+                games[chat_id] = {
+                    "user_id": user_id,
+                    "opened": False,
+                    "boxes": create_boxes()
+                }
+
+                send(
+                    chat_id,
+                    "🎰 <b>ДЖЕКПОТ 777!</b>\n\n🎁 Выбери коробку",
+                    msg["message_id"],
+                    make_keyboard()
+                )
+
+            # 💬 случайные сообщения
+            msg_counter += 1
+
+            if msg_counter >= target:
+                msg_counter = 0
+                target = random.randint(5, 15)
+
+                send(
+                    chat_id,
+                    random.choice(messages),
+                    msg["message_id"]
+                )
+
+        time.sleep(1)
 
     except Exception as e:
         print("ERROR:", e)
