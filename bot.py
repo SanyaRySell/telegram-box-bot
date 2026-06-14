@@ -2,21 +2,24 @@ import requests
 import time
 import random
 import json
+import os
 
-TOKEN = "8807117107:AAFmuQU7pxZ6R8FdWF5QsevJePpe6MqGl8E"
+TOKEN = os.getenv("BOT_TOKEN")
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 offset = 0
 games = {}
 
-msg_counter = 0
-target = random.randint(5, 15)
+# ======================
+# 🎰 слот-сообщения (раз в 5–15 слотов)
+slot_counter = 0
+slot_target = random.randint(5, 15)
 
-messages = [
-    "🎰 ПОЧТИ JACKPOT 777! 🎰",
-    "🎁 Слишком близко чтобы сдаваться",
-    "🔥 Удача уже рядом",
-    "💎 Ты почти поймал NFT"
+slot_messages = [
+    "🏆 Три семерки уже совсем рядом!",
+    "🎉 Ты уже слишком близко к джекпоту",
+    "🎁 Слишком близко, чтобы сдаваться",
+    "🎰 Почти 777"
 ]
 
 
@@ -34,7 +37,10 @@ def send(chat_id, text, reply_to=None, markup=None):
     if markup:
         data["reply_markup"] = json.dumps(markup)
 
-    requests.post(URL + "/sendMessage", data=data)
+    try:
+        requests.post(URL + "/sendMessage", data=data, timeout=10)
+    except:
+        pass
 
 
 # ======================
@@ -59,8 +65,13 @@ def make_keyboard():
 def create_boxes():
     boxes = {}
 
+    nft_pos = random.randint(1, 25)
+
     for i in range(1, 26):
-        boxes[i] = random.choice([15, 25])  # 💥 NFT НЕТ ВООБЩЕ
+        if i == nft_pos:
+            boxes[i] = "NFT"
+        else:
+            boxes[i] = random.choice([15, 15, 15, 15, 25, 25, 25, 25, 25, 25])
 
     return boxes
 
@@ -76,10 +87,13 @@ def show_result(game, chosen):
 
             val = game["boxes"][n]
 
-            if n == chosen:
-                txt = f"🎉 {val}⭐"
+            if val == "NFT":
+                txt = "💎 NFT"
             else:
                 txt = f"{val}⭐"
+
+            if n == chosen:
+                txt = "✅ " + txt
 
             row.append({
                 "text": txt,
@@ -119,9 +133,17 @@ def handle_gift(cb):
     chosen = int(cb["data"])
     result = game["boxes"][chosen]
 
+    # 💥 NFT НИКОГДА не выигрывается
+    if result == "NFT":
+        result = 25
+
     text = (
-        f"🎁 <b>Вы выиграли {result} звёзд</b>\n\n"
-        "<b>Заберите выигрыш в закрепе</b>"
+        "🏆 <b>ДЖЕКПОТ</b> 🏆\n\n"
+        "<b>Выберите одну из ячеек ниже.</b>\n"
+        "<b>В одной из них находится ГЛАВНЫЙ ПРИЗ - NFT.</b>\n"
+        "<b>В остальных спрятаны 15 и 25 звёзды.</b>\n\n"
+        f"🎁 <b>Вы выиграли {result} ⭐</b>\n\n"
+        "<b>Заберите награду в закрепе</b>"
     )
 
     requests.post(URL + "/editMessageText", data={
@@ -138,7 +160,9 @@ print("BOT STARTED")
 
 while True:
     try:
-        r = requests.get(URL + f"/getUpdates?offset={offset}&timeout=20").json()
+        r = requests.get(
+            URL + f"/getUpdates?offset={offset}&timeout=20"
+        ).json()
 
         for upd in r.get("result", []):
             offset = upd["update_id"] + 1
@@ -154,15 +178,26 @@ while True:
             chat_id = msg["chat"]["id"]
             user_id = msg["from"]["id"]
 
-            is_777 = False
+            # 🚫 только слот запускает игру
+            if msg.get("dice") and msg["dice"]["emoji"] == "🎰":
 
-            if msg.get("text") == "777":
-                is_777 = True
+                # 💬 слот-сообщения раз в 5–15
+                slot_counter += 1
 
-            if msg.get("dice") and msg["dice"]["value"] == 64:
-                is_777 = True
+                if slot_counter >= slot_target:
+                    slot_counter = 0
+                    slot_target = random.randint(5, 15)
 
-            if is_777:
+                    send(
+                        chat_id,
+                        random.choice(slot_messages),
+                        msg["message_id"]
+                    )
+
+                # ❗ если игра уже идёт — не создаём новую
+                if chat_id in games and not games[chat_id]["opened"]:
+                    continue
+
                 games[chat_id] = {
                     "user_id": user_id,
                     "opened": False,
@@ -174,19 +209,6 @@ while True:
                     "🎰 <b>ДЖЕКПОТ 777!</b>\n\n🎁 Выбери коробку",
                     msg["message_id"],
                     make_keyboard()
-                )
-
-            # 💬 случайные сообщения
-            msg_counter += 1
-
-            if msg_counter >= target:
-                msg_counter = 0
-                target = random.randint(5, 15)
-
-                send(
-                    chat_id,
-                    random.choice(messages),
-                    msg["message_id"]
                 )
 
         time.sleep(1)
