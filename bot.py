@@ -11,11 +11,11 @@ offset = 0
 games = {}
 
 # ======================
-# 🎰 слот-сообщения (раз в 5–15 слотов)
-slot_counter = 0
-slot_target = random.randint(5, 15)
+# 💬 слот-сообщения
+msg_counter = 0
+target = random.randint(5, 15)
 
-slot_messages = [
+messages = [
     "🏆 Три семерки уже совсем рядом!",
     "🎉 Ты уже слишком близко к джекпоту",
     "🎁 Слишком близко, чтобы сдаваться",
@@ -71,7 +71,7 @@ def create_boxes():
         if i == nft_pos:
             boxes[i] = "NFT"
         else:
-            boxes[i] = random.choice([15, 15, 15, 15, 25, 25, 25, 25, 25, 25])
+            boxes[i] = random.choice([15, 15, 15, 25, 25, 25, 25, 25, 25, 25])
 
     return boxes
 
@@ -142,6 +142,7 @@ def handle_gift(cb):
         "<b>Выберите одну из ячеек ниже.</b>\n"
         "<b>В одной из них находится ГЛАВНЫЙ ПРИЗ - NFT.</b>\n"
         "<b>В остальных спрятаны 15 и 25 звёзды.</b>\n\n"
+        "🎉 <b>Поздравляю!</b>\n\n"
         f"🎁 <b>Вы выиграли {result} ⭐</b>\n\n"
         "<b>Заберите награду в закрепе</b>"
     )
@@ -178,23 +179,27 @@ while True:
             chat_id = msg["chat"]["id"]
             user_id = msg["from"]["id"]
 
-            # 🚫 только слот запускает игру
+            # 🎰 ТОЛЬКО СЛОТ
             if msg.get("dice") and msg["dice"]["emoji"] == "🎰":
 
-                # 💬 слот-сообщения раз в 5–15
-                slot_counter += 1
+                # 💬 сообщения раз в 5–15 слотов
+                msg_counter += 1
 
-                if slot_counter >= slot_target:
-                    slot_counter = 0
-                    slot_target = random.randint(5, 15)
+                if msg_counter >= target:
+                    msg_counter = 0
+                    target = random.randint(5, 15)
 
                     send(
                         chat_id,
-                        random.choice(slot_messages),
+                        random.choice(messages),
                         msg["message_id"]
                     )
 
-                # ❗ если игра уже идёт — не создаём новую
+                # ❗ ТОЛЬКО 777 (value 64)
+                if msg["dice"]["value"] != 64:
+                    continue
+
+                # ❗ блокировка повторной игры
                 if chat_id in games and not games[chat_id]["opened"]:
                     continue
 
@@ -206,7 +211,10 @@ while True:
 
                 send(
                     chat_id,
-                    "🎰 <b>ДЖЕКПОТ 777!</b>\n\n🎁 Выбери коробку",
+                    "🏆 <b>ДЖЕКПОТ</b> 🏆\n\n"
+                    "<b>Выберите одну из ячеек ниже.</b>\n"
+                    "<b>В одной из них находится ГЛАВНЫЙ ПРИЗ - NFT.</b>\n"
+                    "<b>В остальных спрятаны 15 и 25 звёзды.</b>",
                     msg["message_id"],
                     make_keyboard()
                 )
