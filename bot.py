@@ -1,28 +1,31 @@
 import os
-import requests
 import time
-import random
 import json
+import random
+import requests
 
 TOKEN = os.getenv("BOT_TOKEN")
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 offset = 0
 
+# активные игры
 games = {}
 
-# ===============================
-# СЧЁТЧИК СООБЩЕНИЙ ДЛЯ АНИМАЦИИ
-# ===============================
-message_counter = 0
-next_trigger = random.randint(5, 15)
+# счётчик СЛОТОВ (не сообщений)
+slot_counter = 0
+next_slot_trigger = random.randint(5, 15)
+
+slot_texts = [
+    "Очень близко! А значит шанс еще живой 🤩",
+    "Слишком близко, чтобы сдаваться 🤩",
+    "Почти 777 🤩",
+    "Удача уже очень близко 🤩"
+]
 
 print("BOT STARTED")
 
 
-# ===============================
-# ОТПРАВКА СООБЩЕНИЙ
-# ===============================
 def send(chat_id, text, reply_to=None, markup=None):
     data = {
         "chat_id": chat_id,
@@ -42,9 +45,6 @@ def send(chat_id, text, reply_to=None, markup=None):
         pass
 
 
-# ===============================
-# КЛАВИАТУРА 5x5
-# ===============================
 def keyboard():
     kb = []
     n = 1
@@ -62,26 +62,16 @@ def keyboard():
     return {"inline_keyboard": kb}
 
 
-# ===============================
-# СОЗДАНИЕ КОРОБОК
-# ===============================
 def create_boxes():
     boxes = {}
 
-    nft_position = random.randint(1, 25)
-
     for i in range(1, 26):
-        if i == nft_position:
-            boxes[i] = "NFT"
-        else:
-            boxes[i] = random.choice([15, 25])
+        # NFT НИКОГДА не выигрывается
+        boxes[i] = random.choice([15, 25])
 
     return boxes
 
 
-# ===============================
-# ОТКРЫТИЕ КОРОБКИ
-# ===============================
 def open_box(cb):
     chat_id = cb["message"]["chat"]["id"]
     user_id = cb["from"]["id"]
@@ -105,20 +95,14 @@ def open_box(cb):
     game["opened"] = True
 
     chosen = int(cb["data"])
-    result = game["boxes"][chosen]
 
-    # NFT = редкий выигрыш
-    if result == "NFT":
-        stars = 25
-        title = "💎 NFT ДЖЕКПОТ!"
-    else:
-        stars = result
-        title = "🎁 ВЫИГРЫШ"
+    # выбранная коробка
+    selected_text = "✅"
 
     text = (
-        f"{title}\n\n"
-        f"🎉 <b>Вы выиграли {stars} ⭐</b>\n\n"
-        "🎰 <b>Вы почти выиграли NFT</b>\n\n"
+        f"🎉 <b>Вы выиграли {game['boxes'][chosen]} ⭐</b>\n\n"
+        "🎰 <b>Вы почти выиграли NFT</b>\n"
+        "💎 <b>NFT нельзя получить</b>\n\n"
         "<b>Заберите награду в закрепе</b>"
     )
 
@@ -130,24 +114,32 @@ def open_box(cb):
     })
 
 
-# ===============================
-# АНИМАЦИИ / СЛУЧАЙНЫЕ СООБЩЕНИЯ
-# ===============================
-def random_animation(chat_id):
-    texts = [
-        "🎰 777 крутится...",
-        "💎 NFT почти выпал...",
-        "🎁 удача на подходе...",
-        "🔥 система анализирует шанс...",
-        "🎉 бонус энергия активирована..."
-    ]
+def handle_slot(chat_id, user_id, msg_id):
+    global slot_counter, next_slot_trigger
 
-    send(chat_id, random.choice(texts))
+    slot_counter += 1
+
+    # рандомное сообщение каждые 5–15 слотов
+    if slot_counter >= next_slot_trigger:
+        send(chat_id, random.choice(slot_texts))
+        slot_counter = 0
+        next_slot_trigger = random.randint(5, 15)
+
+    # старт игры по слоту 🎰
+    games[chat_id] = {
+        "user_id": user_id,
+        "boxes": create_boxes(),
+        "opened": False
+    }
+
+    send(
+        chat_id,
+        "🏆 <b>ДЖЕКПОТ</b> 🏆\n\nВыберите одну из ячеек ниже.",
+        msg_id,
+        keyboard()
+    )
 
 
-# ===============================
-# ГЛАВНЫЙ ЦИКЛ
-# ===============================
 while True:
     try:
         r = requests.get(
@@ -156,15 +148,10 @@ while True:
             timeout=30
         ).json()
 
-        if not r.get("ok"):
-            continue
-
         for upd in r.get("result", []):
             offset = upd["update_id"] + 1
 
-            # =======================
-            # КНОПКИ
-            # =======================
+            # кнопки
             if "callback_query" in upd:
                 open_box(upd["callback_query"])
                 continue
@@ -175,38 +162,12 @@ while True:
             msg = upd["message"]
             chat_id = msg["chat"]["id"]
             user_id = msg["from"]["id"]
+            msg_id = msg["message_id"]
 
-            text = msg.get("text", "").strip()
-
-            print("MSG:", text)
-
-            # =======================
-            # 777 СТАРТ ИГРЫ
-            # =======================
-            if text == "777":
-
-                games[chat_id] = {
-                    "user_id": user_id,
-                    "opened": False,
-                    "boxes": create_boxes()
-                }
-
-                send(
-                    chat_id,
-                    "🏆 <b>ДЖЕКПОТ 777!</b>\n\nВыберите коробку 👇",
-                    msg["message_id"],
-                    keyboard()
-                )
-
-            # =======================
-            # СЧЁТЧИК СООБЩЕНИЙ
-            # =======================
-            message_counter += 1
-
-            if message_counter >= next_trigger:
-                random_animation(chat_id)
-                message_counter = 0
-                next_trigger = random.randint(5, 15)
+            # 🎰 слот Telegram
+            if "dice" in msg:
+                if msg["dice"]["emoji"] == "🎰":
+                    handle_slot(chat_id, user_id, msg_id)
 
         time.sleep(0.5)
 
