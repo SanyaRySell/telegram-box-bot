@@ -8,18 +8,7 @@ TOKEN = os.getenv("BOT_TOKEN")
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 offset = 0
-
 games = {}
-
-# защита от спама слотов
-slot_lock = {}
-
-slot_texts = [
-    "Очень близко! А значит шанс еще живой 🤩",
-    "Слишком близко, чтобы сдаваться 🤩",
-    "Почти 777 🤩",
-    "Удача уже очень близко 🤩"
-]
 
 print("BOT STARTED")
 
@@ -38,10 +27,7 @@ def send(chat_id, text, reply_to=None, markup=None):
     if markup:
         data["reply_markup"] = json.dumps(markup)
 
-    try:
-        requests.post(URL + "/sendMessage", data=data, timeout=10)
-    except:
-        pass
+    requests.post(URL + "/sendMessage", data=data)
 
 
 # =====================
@@ -66,8 +52,7 @@ def keyboard():
 def create_boxes():
     boxes = {}
     for i in range(1, 26):
-        # NFT НЕ существует
-        boxes[i] = random.choice([15, 25])
+        boxes[i] = random.choice([15, 25])  # NFT НЕТ ВООБЩЕ
     return boxes
 
 
@@ -99,7 +84,6 @@ def open_box(cb):
 
     text = (
         f"🎉 <b>Вы выиграли {result} ⭐</b>\n\n"
-        "💎 <b>NFT нельзя выиграть</b>\n\n"
         "<b>Заберите награду в закрепе</b>"
     )
 
@@ -112,9 +96,13 @@ def open_box(cb):
 
 
 # =====================
-def handle_slot(chat_id, user_id, msg_id):
+def handle_slot(chat_id, user_id, msg_id, value):
 
-    # защита: игра уже идёт
+    # ❗ ВАЖНО: ТОЛЬКО 777 (64)
+    if value != 64:
+        return  # НИЧЕГО НЕ ДЕЛАЕМ
+
+    # если игра уже идёт
     if chat_id in games and not games[chat_id]["opened"]:
         return
 
@@ -126,7 +114,7 @@ def handle_slot(chat_id, user_id, msg_id):
 
     send(
         chat_id,
-        "🏆 <b>ДЖЕКПОТ</b> 🏆\n\nВыберите одну из ячеек ниже.",
+        "🏆 <b>ДЖЕКПОТ 777!</b> 🏆\n\nВыберите коробку",
         msg_id,
         keyboard()
     )
@@ -144,11 +132,6 @@ while True:
         for upd in r.get("result", []):
             offset = upd["update_id"] + 1
 
-            # кнопки
-            if "callback_query" in upd:
-                open_box(upd["callback_query"])
-                continue
-
             if "message" not in upd:
                 continue
 
@@ -160,15 +143,12 @@ while True:
             # 🎰 слот Telegram
             if "dice" in msg:
                 if msg["dice"]["emoji"] == "🎰":
-
-                    # анти-спам слота
-                    if chat_id in slot_lock:
-                        if time.time() - slot_lock[chat_id] < 2:
-                            continue
-
-                    slot_lock[chat_id] = time.time()
-
-                    handle_slot(chat_id, user_id, msg_id)
+                    handle_slot(
+                        chat_id,
+                        user_id,
+                        msg_id,
+                        msg["dice"]["value"]
+                    )
 
         time.sleep(0.5)
 
